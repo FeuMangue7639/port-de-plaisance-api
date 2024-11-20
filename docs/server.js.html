@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>JSDoc: Source: server.js</title>
+
+    <script src="scripts/prettify/prettify.js"> </script>
+    <script src="scripts/prettify/lang-css.js"> </script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <link type="text/css" rel="stylesheet" href="styles/prettify-tomorrow.css">
+    <link type="text/css" rel="stylesheet" href="styles/jsdoc-default.css">
+</head>
+
+<body>
+
+<div id="main">
+
+    <h1 class="page-title">Source: server.js</h1>
+
+    
+
+
+
+    
+    <section>
+        <article>
+            <pre class="prettyprint source linenums"><code>/**
+ * @file Server.js
+ * @description Point d'entrée principal de l'application. Configure Express, MongoDB, Swagger et les routes principales.
+ */
+
+require('dotenv').config();
+const express = require('express');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const catwayRoutes = require('./routes/catwayRoutes');
+const reservationRoutes = require('./routes/reservationRoutes');
+const swaggerUi = require('swagger-ui-express');
+const swaggerJsdoc = require('swagger-jsdoc');
+const path = require('path');
+const jwt = require('jsonwebtoken');
+
+/**
+ * Instance principale de l'application Express.
+ * @type {Express}
+ */
+const app = express();
+app.use(bodyParser.json());
+
+/**
+ * @function
+ * @description Connecte l'application à MongoDB.
+ * @returns {Promise&lt;void>} Promise résolue si la connexion est réussie.
+ */
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log('MongoDB connected'))
+    .catch((err) => console.error('MongoDB connection error:', err));
+
+/**
+ * Route de base pour vérifier le fonctionnement du serveur.
+ * @name GET /
+ * @function
+ * @memberof module:routes
+ * @inner
+ * @param {Object} req - Objet de la requête.
+ * @param {Object} res - Objet de la réponse.
+ * @returns {String} Message de bienvenue.
+ */
+app.get('/', (req, res) => {
+    res.send('Bienvenue à l\'API du port de plaisance de Russell');
+});
+
+/**
+ * Route de test pour la création de modèles `Catway` et `Reservation`.
+ * @name GET /test-models
+ * @function
+ * @memberof module:routes
+ * @inner
+ * @param {Object} req - Objet de la requête.
+ * @param {Object} res - Objet de la réponse.
+ * @returns {Object} Les objets créés pour le test.
+ */
+app.get('/test-models', async (req, res) => {
+    try {
+        const catway = await Catway.create({
+            catwayNumber: 1,
+            type: 'long',
+            catwayState: 'Disponible',
+        });
+
+        const reservation = await Reservation.create({
+            catwayNumber: 1,
+            clientName: 'John Doe',
+            boatName: 'Sea Breeze',
+            checkIn: new Date('2024-11-20'),
+            checkOut: new Date('2024-11-25'),
+        });
+
+        res.json({ catway, reservation });
+    } catch (error) {
+        console.error(error);
+        res.status(500).send('Erreur lors de la création des modèles.');
+    }
+});
+
+/**
+ * Route pour générer un token JWT à partir d'un nom d'utilisateur.
+ * @name POST /login
+ * @function
+ * @memberof module:routes
+ * @inner
+ * @param {Object} req - Objet de la requête.
+ * @param {Object} res - Objet de la réponse.
+ * @returns {Object} Le token JWT.
+ */
+app.post('/login', (req, res) => {
+    const { username } = req.body;
+    if (!username) {
+        return res.status(400).json({ message: 'Nom d\'utilisateur requis.' });
+    }
+
+    const user = { name: username };
+    const accessToken = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+
+    res.json({ accessToken });
+});
+
+/**
+ * Route pour afficher le formulaire de connexion.
+ * @name GET /login
+ * @function
+ * @memberof module:routes
+ * @inner
+ * @param {Object} req - Objet de la requête.
+ * @param {Object} res - Objet de la réponse.
+ * @returns {HTML} Le fichier `login.html`.
+ */
+app.get('/login', (req, res) => {
+    res.sendFile(path.join(__dirname, 'login.html'));
+});
+
+/**
+ * Route pour authentifier un utilisateur et générer un token JWT.
+ * @name POST /login
+ * @function
+ * @memberof module:routes
+ * @inner
+ * @param {Object} req - Objet de la requête.
+ * @param {Object} res - Objet de la réponse.
+ * @returns {Object} Le token JWT.
+ */
+app.post('/login', async (req, res) => {
+    const { username, password } = req.body;
+
+    try {
+        const user = await User.findOne({ username });
+        if (!user) {
+            return res.status(404).json({ message: 'Utilisateur non trouvé.' });
+        }
+
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        if (!isPasswordValid) {
+            return res.status(403).json({ message: 'Mot de passe incorrect.' });
+        }
+
+        const accessToken = jwt.sign({ name: user.username }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: '1h' });
+        res.json({ accessToken });
+    } catch (error) {
+        res.status(500).json({ message: 'Erreur lors de la connexion.', error });
+    }
+});
+
+/**
+ * Documentation Swagger.
+ * @type {Object}
+ */
+const swaggerOptions = {
+    definition: {
+        openapi: '3.0.0',
+        info: {
+            title: 'Port de Plaisance API',
+            version: '1.0.0',
+            description: 'API pour la gestion des catways et des réservations dans le port de plaisance.',
+        },
+        servers: [
+            {
+                url: 'http://localhost:3000',
+            },
+        ],
+    },
+    apis: ['./routes/*.js'],
+};
+
+const swaggerDocs = swaggerJsdoc(swaggerOptions);
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
+/**
+ * Inclusion des routes principales.
+ */
+app.use('/catways', catwayRoutes);
+app.use('/reservations', reservationRoutes);
+const userRoutes = require('./routes/userRoutes'); // Import des routes utilisateurs
+app.use('/users', userRoutes);
+
+/**
+ * Démarrage du serveur.
+ * @name start
+ * @function
+ * @description Démarre le serveur sur le port spécifié dans `.env` ou 3000 par défaut.
+ */
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+});
+
+module.exports = app;
+</code></pre>
+        </article>
+    </section>
+
+
+
+
+</div>
+
+<nav>
+    <h2><a href="index.html">Home</a></h2><h3>Global</h3><ul><li><a href="global.html#app">app</a></li><li><a href="global.html#start">start</a></li><li><a href="global.html#swaggerOptions">swaggerOptions</a></li></ul>
+</nav>
+
+<br class="clear">
+
+<footer>
+    Documentation generated by <a href="https://github.com/jsdoc/jsdoc">JSDoc 4.0.4</a> on Wed Nov 20 2024 17:50:38 GMT+0100 (heure normale d’Europe centrale)
+</footer>
+
+<script> prettyPrint(); </script>
+<script src="scripts/linenumber.js"> </script>
+</body>
+</html>

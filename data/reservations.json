@@ -1,0 +1,24 @@
+[
+    {
+      "catwayNumber": 1,
+      "clientName": "John Doe",
+      "boatName": "Sea Breeze",
+      "checkIn": "2024-11-20",
+      "checkOut": "2024-11-25"
+    },
+    {
+      "catwayNumber": 2,
+      "clientName": "Jane Smith",
+      "boatName": "Ocean Wave",
+      "checkIn": "2024-11-22",
+      "checkOut": "2024-11-30"
+    },
+    {
+      "catwayNumber": 3,
+      "clientName": "Michael Brown",
+      "boatName": "Sunny Horizon",
+      "checkIn": "2024-12-01",
+      "checkOut": "2024-12-10"
+    }
+  ]
+  

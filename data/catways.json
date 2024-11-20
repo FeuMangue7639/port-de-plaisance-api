@@ -1,0 +1,7 @@
+[
+    { "catwayNumber": 1, "type": "long", "catwayState": "Disponible" },
+    { "catwayNumber": 2, "type": "short", "catwayState": "Indisponible" },
+    { "catwayNumber": 3, "type": "long", "catwayState": "Disponible" },
+    { "catwayNumber": 4, "type": "short", "catwayState": "Indisponible" }
+  ]
+  
